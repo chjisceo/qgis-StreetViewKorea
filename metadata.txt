@@ -3,19 +3,31 @@ name=Street View Korea
 qgisMinimumVersion=3.0
 qgisMaximumVersion=3.99
 description=Street View Korea
-version=1.0
+version=1.0.1
 author=Harry Cho
-email=hangjin.cho@hyundai-autoever.com
+email=chjiscpa@gmail.com
 
-changelog = Version for new api parameter
+changelog =
+    1.0.1
+        - Update How to use.
+    1.0.0
+        - Added KAKAO(DAUM), NAVER Street View (2022-05-18)
 
-about =Streetview allows you to open a web page with the KAKAO, NAVER Street View that highlights the part you have identified with two points (the base and target points) The target point is identified by dragging the base point
 
-tags=StreetView about KAKAO and Naver RoadView
+about =
+Streetview allows you to open a web page with the KAKAO, NAVER that highlights the part you have identified with two points (the base and target points)
+The target point is identified by dragging the base point
+
+KAKAO Street View is set as the default.
+
+If you hold down the ctrl key and drag the map, NAVER Map will appear in a new tab.
+
+
+tags=StreetView about KAKAO and Naver
 
 homepage=
 tracker=
-repository=
+repository=https://github.com/chjisceo/qgis-StreetViewKorea.git
 icon=icon.png
 
 experimental=False
