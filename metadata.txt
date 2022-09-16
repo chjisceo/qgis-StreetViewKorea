@@ -5,7 +5,7 @@ name=Street View Korea
 qgisMinimumVersion=3.0
 qgisMaximumVersion=3.99
 description=Street View Naver, KAKAO
-version=1.0.1
+version=1.1.0
 author=Harry Cho
 email=chjiscpa@gmail.com
 
@@ -13,6 +13,9 @@ email=chjiscpa@gmail.com
 
 # Optional items:
 changelog =
+    1.1.0
+        - Fix minor issues from KAKAO
+        - Added Naver Street View shortcut function (2022-09-16)
     1.0.1
         - Update How to use.
     1.0.0

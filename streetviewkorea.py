@@ -33,6 +33,7 @@ import os.path
 import math
 import webbrowser 
 import requests
+import json
 rb=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.PointGeometry )
 rl=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.LineGeometry )
 premuto= False
@@ -127,43 +128,79 @@ class PointTool(QgsMapTool):
             premuto=False
             linea=False
             actual_crs = self.canvas.mapSettings().destinationCrs()
-            
-            # print(str(int(angle)))
-            
 
-            #print('https://map.naver.com/v5/?c=' + str(pt1.x()) + ',' + str(pt1.y()) + ',19,0,0,0,dha=p&=')
-            
-            if CTRLPressed: # NAVER when you drag with ctrl
+            if CTRLPressed:  # NAVER when you drag with ctrl
                 # Naver EPSG:3857
-                crsDest = QgsCoordinateReferenceSystem(3857)  # NAVER
+                crsDest = QgsCoordinateReferenceSystem(4326)  # NAVER
                 xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
                 pt1 = xform.transform(point0)
-                
-                webbrowser.open(url = 'https://map.naver.com/v5/?c=' + str(pt1.x()) + ',' + str(pt1.y()) + ',18,0,0,0,dha=p&=', new=0)
-                
-            else: # KAKAO when you drag
-                crsDest = QgsCoordinateReferenceSystem(4326)  # WGS 84 / UTM zone 33N
-                xform = QgsCoordinateTransform(actual_crs, crsDest,QgsProject.instance())
-                pt1 = xform.transform(point0)
-               
-                # print ('https://www.google.com/maps/@?api=1&map_action=pano&pano=tu510ie_z4ptBZYo2BGEJg&viewpoint='+str(pt1.y())+','+str(pt1.x())+'&heading='+str(int(angle)) +'&pitch=10&fov=250')
-                # webbrowser.open_new('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+str(pt1.y())+','+str(pt1.x())+'&heading='+str(int(angle)) +'&pitch=10&fov=250')
-                
-                # KAKAO
-                kakao_url = 'https://map.kakao.com/link/roadview/'+str(pt1.y())+','+str(pt1.x())
-                # webbrowser.open_new('https://map.kakao.com/link/roadview/'+str(pt1.y())+','+str(pt1.x())) # WGS 84 : same as Google X, Y
 
-                response = requests.get(url=kakao_url) # send url and get Full URL
-                temp_url = response.url
-                
-                # print(temp_url)
-                pan_idx = temp_url.find('pan=')
-                special_idx = temp_url[pan_idx:].find('&')
-                txt = temp_url[pan_idx:pan_idx+special_idx]
-                temp_url = temp_url.replace(txt, 'pan={}'.format(str(int(angle))))
-                
-                webbrowser.open(temp_url, new=0)
-            
+                # Get panoid
+                n_url = 'https://m.map.naver.com/viewer/panorama.naver?lng={}&lat={}'.format(str(pt1.x()), str(pt1.y()))
+                response = requests.get(n_url, verify=False)
+
+                # get panorama part
+                text = response.text
+                idx = text.find('"panorama"') + 12
+                end_idx = text[idx:].find("}")
+                pano = text[idx:idx + end_idx + 1]
+
+                # id, pan, tilt, lng, lat, fov
+                pr = json.loads(pano)
+
+                # change coord as EPSG:3857
+                crsDest = QgsCoordinateReferenceSystem(3857)  # NAVER
+                xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
+                pt2 = xform.transform(point0)
+
+                # change angle range 0~179 , -180~0
+                if angle > 180:
+                    angle -= 360
+
+                # create full naver url
+                naver_url = "https://map.naver.com/v5/?c={0},{1},16,0,0,0,dha&p={2},{3},{4},80,Float".format(str(pt2.x()),str(pt2.y()),pr["id"],str(float(angle)),pr['tilt'])
+
+                try:
+                    webbrowser.get("C:/Program Files/Google/Chrome/Application/chrome.exe %s").open(naver_url)
+                except:
+                    webbrowser.get("C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s").open(naver_url)
+
+            else:  # KAKAO when you drag
+                crsDest = QgsCoordinateReferenceSystem(4326)  # WGS 84 / UTM zone 33N
+                xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
+                pt1 = xform.transform(point0)
+
+
+                # KAKAO request to get panoid
+                kakao_url = 'https://map.kakao.com/link/roadview/' + str(pt1.y()) + ',' + str(pt1.x())
+
+                # send url and get Full URL
+                response = requests.get(url=kakao_url, verify=False)
+                k_return_url = response.url
+
+                # replace pan as QGIS angle
+                pan_idx = k_return_url.find('pan=')
+                special_idx = k_return_url[pan_idx:].find('&')
+                txt = k_return_url[pan_idx:pan_idx + special_idx]
+                k_return_url = k_return_url.replace(txt, 'pan={}'.format(str(int(angle))))
+
+                # replace X coord as WGS 84
+                x_idx = k_return_url.find('urlX=')
+                special_idx = k_return_url[x_idx:].find('&')
+                txt = k_return_url[x_idx:x_idx + special_idx]
+                k_return_url = k_return_url.replace(txt, 'urlX={}'.format(str(pt1.x())))
+
+                # replace Y coord as WGS 84
+                y_idx = k_return_url.find('urlY=')
+                txt = k_return_url[y_idx:]
+                k_return_url = k_return_url.replace(txt, 'urlY={}'.format(str(pt1.y())))
+
+                # Run on Chrome if get error, change chrome.exe path
+                try:
+                    webbrowser.get("C:/Program Files/Google/Chrome/Application/chrome.exe %s").open(k_return_url)
+                except:
+                    webbrowser.get("C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s").open(k_return_url)
+
             rl.reset()
             rb.reset()           
             self.canvas.unsetMapTool(self)           
