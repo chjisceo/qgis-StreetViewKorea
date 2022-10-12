@@ -31,9 +31,11 @@ from .resources_rc import *
 # Import the code for the dialog
 import os.path
 import math
-import webbrowser 
+import webbrowser
 import requests
 import json
+import warnings
+warnings.filterwarnings(action='ignore')
 rb=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.PointGeometry )
 rl=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.LineGeometry )
 premuto= False
@@ -41,11 +43,13 @@ linea=False
 point0=iface.mapCanvas().getCoordinateTransform().toMapCoordinates(0, 0)
 point1=iface.mapCanvas().getCoordinateTransform().toMapCoordinates(0, 0)
 
+
 class StreetViewKorea:
 
     def __init__(self, iface):
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
+        
         # locale = QtCore.QSettings().value("locale/userLocale", defaultValue="")[0:2]
         # localePath = os.path.join(self.plugin_dir, 'i18n', 'streetview_{}.qm'.format(locale))
 
@@ -55,7 +59,7 @@ class StreetViewKorea:
         #
         #     if qVersion() > '4.3.3':
         #         QCoreApplication.installTranslator(self.translator)
-         
+        
     def run(self):
         tool = PointTool(self.iface.mapCanvas())
         self.iface.mapCanvas().setMapTool(tool)
@@ -82,7 +86,25 @@ class PointTool(QgsMapTool):
         
             QgsMapTool.__init__(self, canvas)
             self.canvas = canvas    
-
+            self.plugin_dir = os.path.dirname(__file__)
+            chrome_path = os.path.join(self.plugin_dir, 'chrome_path.txt')
+        
+            # check chrome.exe path
+            if os.path.isfile(chrome_path) == False:
+                filepath = self.findFile("chrome.exe", "C:\\")
+                with open(chrome_path,'x') as f:
+                    f.write(filepath.replace("\\",'/'))
+                    
+            else:
+                with open(chrome_path,'r') as f:
+                    self.chrome_path = f.read().replace('\\','/')
+                
+        def findFile(self, name, path):
+            for dirpath, dirname, filename in os.walk(path):
+                if name in filename:
+                    return os.path.join(dirpath, name)
+                        
+    
         def canvasPressEvent(self, event):
             x = event.pos().x()
             y = event.pos().y()
@@ -161,45 +183,33 @@ class PointTool(QgsMapTool):
                 naver_url = "https://map.naver.com/v5/?c={0},{1},16,0,0,0,dha&p={2},{3},{4},80,Float".format(str(pt2.x()),str(pt2.y()),pr["id"],str(float(angle)),pr['tilt'])
 
                 try:
-                    webbrowser.get("C:/Program Files/Google/Chrome/Application/chrome.exe %s").open(naver_url)
+                    webbrowser.get(f"{self.chrome_path} %s").open(naver_url)
+                    
                 except:
-                    webbrowser.get("C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s").open(naver_url)
+                    QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
 
             else:  # KAKAO when you drag
-                crsDest = QgsCoordinateReferenceSystem(4326)  # WGS 84 / UTM zone 33N
+                crsDest = QgsCoordinateReferenceSystem(5181)  # WTM
                 xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
                 pt1 = xform.transform(point0)
 
-
-                # KAKAO request to get panoid
-                kakao_url = 'https://map.kakao.com/link/roadview/' + str(pt1.y()) + ',' + str(pt1.x())
+                # KAKAO request to get infos
+                kakao_url = f'https://rv.map.kakao.com/roadview-search/v2/nodes?PX={int(pt1.x())}&PY={int(pt1.y())}&RAD=35&PAGE_SIZE=50&INPUT=wtm&TYPE=w&SERVICE=glpano'
 
                 # send url and get Full URL
                 response = requests.get(url=kakao_url, verify=False)
-                k_return_url = response.url
 
-                # replace pan as QGIS angle
-                pan_idx = k_return_url.find('pan=')
-                special_idx = k_return_url[pan_idx:].find('&')
-                txt = k_return_url[pan_idx:pan_idx + special_idx]
-                k_return_url = k_return_url.replace(txt, 'pan={}'.format(str(int(angle))))
+                st = json.loads(response.text)
 
-                # replace X coord as WGS 84
-                x_idx = k_return_url.find('urlX=')
-                special_idx = k_return_url[x_idx:].find('&')
-                txt = k_return_url[x_idx:x_idx + special_idx]
-                k_return_url = k_return_url.replace(txt, 'urlX={}'.format(str(pt1.x())))
+                rd = st['street_view']['streetList'][0]
+                k_return_url = f"https://map.kakao.com/?panoid={rd['id']}&pan={angle}&zoom=0&map_type=TYPE_MAP&map_attribute=ROADVIEW&urlX={rd['wcongx']}&urlY={rd['wcongy']}"
 
-                # replace Y coord as WGS 84
-                y_idx = k_return_url.find('urlY=')
-                txt = k_return_url[y_idx:]
-                k_return_url = k_return_url.replace(txt, 'urlY={}'.format(str(pt1.y())))
-
-                # Run on Chrome if get error, change chrome.exe path
+                # Run on Chrome
                 try:
-                    webbrowser.get("C:/Program Files/Google/Chrome/Application/chrome.exe %s").open(k_return_url)
+                    webbrowser.get(f"{self.chrome_path} %s").open(k_return_url)
+
                 except:
-                    webbrowser.get("C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s").open(k_return_url)
+                    QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
 
             rl.reset()
             rb.reset()           
