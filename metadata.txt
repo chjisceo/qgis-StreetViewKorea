@@ -14,16 +14,17 @@ email=chjiscpa@gmail.com
 # Optional items:
 changelog =
     1.2.1
-        - chrome_path.txt file added(2022-10-12)
+        - chrome_path.txt file added(22-10-12)
+        - Add log event, changed Icon.(22-10-17)
     1.2.0
-        - KAKAO RoadView fixed Main issues. (2022-10-11)
+        - KAKAO RoadView fixed Main issues. (22-10-11)
     1.1.0
         - Fix minor issues from KAKAO
-        - Added Naver Street View shortcut function (2022-09-16)
+        - Added Naver Street View shortcut function (22-09-16)
     1.0.1
         - Update How to use.
     1.0.0
-        - Added KAKAO(DAUM), NAVER Street View (2022-05-18)
+        - Added KAKAO(DAUM), NAVER Street View (22-05-18)
 
 about = Streetview allows you to open a web page with the KAKAO, NAVER
 

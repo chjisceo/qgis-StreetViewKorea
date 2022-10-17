@@ -160,56 +160,61 @@ class PointTool(QgsMapTool):
                 # Get panoid
                 n_url = 'https://m.map.naver.com/viewer/panorama.naver?lng={}&lat={}'.format(str(pt1.x()), str(pt1.y()))
                 response = requests.get(n_url, verify=False)
+                if response.status_code != 200:
+                    QgsMessageLog.logMessage(f"네이버 지도 오류 [{response.status_code} ERROR : {response.reason}]")
+                else:
+                    # get panorama part
+                    text = response.text
+                    idx = text.find('"panorama"') + 12
+                    end_idx = text[idx:].find("}")
+                    pano = text[idx:idx + end_idx + 1]
 
-                # get panorama part
-                text = response.text
-                idx = text.find('"panorama"') + 12
-                end_idx = text[idx:].find("}")
-                pano = text[idx:idx + end_idx + 1]
+                    # id, pan, tilt, lng, lat, fov
+                    pr = json.loads(pano)
 
-                # id, pan, tilt, lng, lat, fov
-                pr = json.loads(pano)
+                    # change coord as EPSG:3857
+                    crsDest = QgsCoordinateReferenceSystem(3857)  # NAVER
+                    xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
+                    pt2 = xform.transform(point0)
 
-                # change coord as EPSG:3857
-                crsDest = QgsCoordinateReferenceSystem(3857)  # NAVER
-                xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
-                pt2 = xform.transform(point0)
+                    # change angle range 0~179 , -180~0
+                    if angle > 180:
+                        angle -= 360
 
-                # change angle range 0~179 , -180~0
-                if angle > 180:
-                    angle -= 360
+                    # create full naver url
+                    naver_url = "https://map.naver.com/v5/?c={0},{1},16,0,0,0,dha&p={2},{3},{4},80,Float".format(str(pt2.x()),str(pt2.y()),pr["id"],str(float(angle)),pr['tilt'])
 
-                # create full naver url
-                naver_url = "https://map.naver.com/v5/?c={0},{1},16,0,0,0,dha&p={2},{3},{4},80,Float".format(str(pt2.x()),str(pt2.y()),pr["id"],str(float(angle)),pr['tilt'])
+                    try:
+                        webbrowser.get(f"{self.chrome_path} %s").open(naver_url)
 
-                try:
-                    webbrowser.get(f"{self.chrome_path} %s").open(naver_url)
-                    
-                except:
-                    QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
+                    except:
+                        QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
 
             else:  # KAKAO when you drag
                 crsDest = QgsCoordinateReferenceSystem(5181)  # WTM
                 xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
                 pt1 = xform.transform(point0)
 
+
                 # KAKAO request to get infos
                 kakao_url = f'https://rv.map.kakao.com/roadview-search/v2/nodes?PX={int(pt1.x())}&PY={int(pt1.y())}&RAD=35&PAGE_SIZE=50&INPUT=wtm&TYPE=w&SERVICE=glpano'
 
                 # send url and get Full URL
                 response = requests.get(url=kakao_url, verify=False)
+                if response.status_code != 200:
+                    QgsMessageLog.logMessage(f"카카오맵 오류 [{response.status_code} ERROR : {response.reason}]")
+                else:
+                    st = json.loads(response.text)
 
-                st = json.loads(response.text)
+                    rd = st['street_view']['streetList'][0]
+                    k_return_url = f"https://map.kakao.com/?panoid={rd['id']}&pan={angle}&zoom=0&map_type=TYPE_MAP&map_attribute=ROADVIEW&urlX={rd['wcongx']}&urlY={rd['wcongy']}"
 
-                rd = st['street_view']['streetList'][0]
-                k_return_url = f"https://map.kakao.com/?panoid={rd['id']}&pan={angle}&zoom=0&map_type=TYPE_MAP&map_attribute=ROADVIEW&urlX={rd['wcongx']}&urlY={rd['wcongy']}"
+                    # Run on Chrome
+                    try:
+                        webbrowser.get(f"{self.chrome_path} %s").open(k_return_url)
 
-                # Run on Chrome
-                try:
-                    webbrowser.get(f"{self.chrome_path} %s").open(k_return_url)
-
-                except:
-                    QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
+                    except:
+                        QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
 
             rl.reset()
             rb.reset()           
