@@ -35,6 +35,11 @@ import webbrowser
 import requests
 import json
 import warnings
+
+# import fake_useragent
+subprocess.check_call(['python', '-m', 'pip', 'install', 'fake_useragent'])
+from fake_useragent import UserAgent
+
 warnings.filterwarnings(action='ignore')
 rb=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.PointGeometry )
 rl=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.LineGeometry )
@@ -49,16 +54,7 @@ class StreetViewKorea:
     def __init__(self, iface):
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
-        
-        # locale = QtCore.QSettings().value("locale/userLocale", defaultValue="")[0:2]
-        # localePath = os.path.join(self.plugin_dir, 'i18n', 'streetview_{}.qm'.format(locale))
 
-        # if os.path.exists(localePath):
-        #     self.translator = QTranslator()
-        #     self.translator.load(localePath)
-        #
-        #     if qVersion() > '4.3.3':
-        #         QCoreApplication.installTranslator(self.translator)
         
     def run(self):
         tool = PointTool(self.iface.mapCanvas())
@@ -114,8 +110,8 @@ class PointTool(QgsMapTool):
               rb=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.PointGeometry )
               rb.setColor ( QtCore.Qt.red )
               point0 = self.canvas.getCoordinateTransform().toMapCoordinates(x, y)
-              rb.addPoint(point0)  
-  
+              rb.addPoint(point0)
+
         def canvasMoveEvent(self, event):
               x = event.pos().x()
               y = event.pos().y()        
@@ -133,8 +129,22 @@ class PointTool(QgsMapTool):
                   rl.reset(QgsWkbTypes.LineGeometry)
                   rl.addPoint(point0)  
                   rl.addPoint(point1)
-                  
-                  
+
+        # make fake Header
+        def fakeHeaders(self):
+            ua = UserAgent(verify_ssl=False)
+            userAgent = ua.random
+            headers = {
+                "user-agent": f"{userAgent}",
+                "content-type": "application/json",
+                "origin": "https://map.naver.com",
+                "sec-ch-ua": '""Chromium";v="92", " Not A;Brand";v="99", "Google Chrome";v="92"',
+                "accept": "*/*",
+                "accept-language": "ko",
+                "sec-ch-ua-mobile": "?0",
+            }
+            return headers
+
       
         def canvasReleaseEvent(self, event):
             event.modifiers()
@@ -159,7 +169,7 @@ class PointTool(QgsMapTool):
 
                 # Get panoid
                 n_url = 'https://m.map.naver.com/viewer/panorama.naver?lng={}&lat={}'.format(str(pt1.x()), str(pt1.y()))
-                response = requests.get(n_url, verify=False)
+                response = requests.get(n_url, verify=False, headers=self.fakeHeaders())
                 if response.status_code != 200:
                     QgsMessageLog.logMessage(f"네이버 지도 오류 [{response.status_code} ERROR : {response.reason}]")
                 else:
@@ -200,7 +210,7 @@ class PointTool(QgsMapTool):
                 kakao_url = f'https://rv.map.kakao.com/roadview-search/v2/nodes?PX={int(pt1.x())}&PY={int(pt1.y())}&RAD=35&PAGE_SIZE=50&INPUT=wtm&TYPE=w&SERVICE=glpano'
 
                 # send url and get Full URL
-                response = requests.get(url=kakao_url, verify=False)
+                response = requests.get(url=kakao_url, verify=False, headers=self.fakeHeaders())
                 if response.status_code != 200:
                     QgsMessageLog.logMessage(f"카카오맵 오류 [{response.status_code} ERROR : {response.reason}]")
                 else:
