@@ -182,7 +182,35 @@ class PointTool(QgsMapTool):
             linea=False
             actual_crs = self.canvas.mapSettings().destinationCrs()
 
-            if CTRLPressed:  # NAVER when you drag with ctrl
+
+
+            if CTRLPressed:  # KAKAO when you drag with Ctrl
+                crsDest = QgsCoordinateReferenceSystem(5181)  # WTM
+                xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
+                pt1 = xform.transform(point0)
+
+
+                # KAKAO request to get infos
+                kakao_url = f'https://rv.map.kakao.com/roadview-search/v2/nodes?PX={int(pt1.x())}&PY={int(pt1.y())}&RAD=35&PAGE_SIZE=50&INPUT=wtm&TYPE=w&SERVICE=glpano'
+
+                # send url and get Full URL
+                response = requests.get(url=kakao_url, verify=False, headers=self.fakeHeaders())
+                if response.status_code != 200:
+                    QgsMessageLog.logMessage(f"카카오맵 오류 [{response.status_code} ERROR : {response.reason}]")
+                else:
+                    st = json.loads(response.text)
+
+                    rd = st['street_view']['streetList'][0]
+                    k_return_url = f"https://map.kakao.com/?panoid={rd['id']}&pan={angle}&zoom=0&map_type=TYPE_MAP&map_attribute=ROADVIEW&urlX={rd['wcongx']}&urlY={rd['wcongy']}"
+
+                    # Run on Chrome
+                    try:
+                        webbrowser.get(f"{self.chrome_path} %s").open(k_return_url)
+
+                    except:
+                        QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
+
+            else:  # NAVER when you drag
                 # Naver EPSG:3857
                 crsDest = QgsCoordinateReferenceSystem(4326)  # NAVER
                 xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
@@ -217,32 +245,6 @@ class PointTool(QgsMapTool):
 
                     try:
                         webbrowser.get(f"{self.chrome_path} %s").open(naver_url)
-
-                    except:
-                        QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
-
-            else:  # KAKAO when you drag
-                crsDest = QgsCoordinateReferenceSystem(5181)  # WTM
-                xform = QgsCoordinateTransform(actual_crs, crsDest, QgsProject.instance())
-                pt1 = xform.transform(point0)
-
-
-                # KAKAO request to get infos
-                kakao_url = f'https://rv.map.kakao.com/roadview-search/v2/nodes?PX={int(pt1.x())}&PY={int(pt1.y())}&RAD=35&PAGE_SIZE=50&INPUT=wtm&TYPE=w&SERVICE=glpano'
-
-                # send url and get Full URL
-                response = requests.get(url=kakao_url, verify=False, headers=self.fakeHeaders())
-                if response.status_code != 200:
-                    QgsMessageLog.logMessage(f"카카오맵 오류 [{response.status_code} ERROR : {response.reason}]")
-                else:
-                    st = json.loads(response.text)
-
-                    rd = st['street_view']['streetList'][0]
-                    k_return_url = f"https://map.kakao.com/?panoid={rd['id']}&pan={angle}&zoom=0&map_type=TYPE_MAP&map_attribute=ROADVIEW&urlX={rd['wcongx']}&urlY={rd['wcongy']}"
-
-                    # Run on Chrome
-                    try:
-                        webbrowser.get(f"{self.chrome_path} %s").open(k_return_url)
 
                     except:
                         QgsMessageLog.logMessage("ERROR : CANNOT FIND 'chrome.exe' file. Please install chrome first.")
