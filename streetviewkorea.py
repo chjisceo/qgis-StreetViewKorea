@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 /***************************************************************************
  StreetViewKorea
@@ -23,11 +22,12 @@
 """
 # Import the PyQt and QGIS libraries
 from PyQt5 import Qt, QtCore, QtWidgets, QtGui, QtWebKit, QtWebKitWidgets, QtXml, QtNetwork, uic
-import subprocess
+from subprocess import call
 from qgis.core import *
 from qgis.gui import *
 from qgis.utils import *
 from .resources_rc import *
+
 # Import the code for the dialog
 import os.path
 import math
@@ -35,12 +35,31 @@ import webbrowser
 import requests
 import json
 import warnings
-
-# import fake_useragent
-subprocess.check_call(['python', '-m', 'pip', 'install', 'fake_useragent'])
-from fake_useragent import UserAgent
-
 warnings.filterwarnings(action='ignore')
+
+# Import the code for headers
+import pkg_resources
+installed_packages = pkg_resources.working_set
+installed_packages_list = sorted(["%s" % (i.key)] for i in installed_packages)
+
+# install packages
+packages = ['pip','user-agent']
+package_install = []
+for l in packages:
+    if l not in installed_packages_list:
+        package_install.append(l)
+
+# Upgrade or install packages
+def upgrade_package(packages):
+    for package in packages:
+        call("pip install --upgrade " + package, shell=True)
+
+if len(package_install) != 0:
+    upgrade_package(package_install)
+
+# import user-agent
+import user_agent
+
 rb=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.PointGeometry )
 rl=QgsRubberBand(iface.mapCanvas(),QgsWkbTypes.LineGeometry )
 premuto= False
@@ -132,16 +151,18 @@ class PointTool(QgsMapTool):
 
         # make fake Header
         def fakeHeaders(self):
-            ua = UserAgent(verify_ssl=False)
-            userAgent = ua.random
+            navigator = user_agent.generate_navigator()
+            userAgent = navigator['user_agent']
             headers = {
                 "user-agent": f"{userAgent}",
                 "content-type": "application/json",
-                "origin": "https://map.naver.com",
-                "sec-ch-ua": '""Chromium";v="92", " Not A;Brand";v="99", "Google Chrome";v="92"',
-                "accept": "*/*",
+                # "origin": "https://map.naver.com",
+                "sec-ch-ua": '""Chromium";v="111", " Not A;Brand";v="8", "Google Chrome";v="111"',
+                # "accept": "*/*",
                 "accept-language": "ko",
                 "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "windows",
+                "referer": "https://map.naver.com/"
             }
             return headers
 
